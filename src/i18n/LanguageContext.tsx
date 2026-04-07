@@ -1,10 +1,13 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { translations, Language, TranslationKey } from './translations';
 
+type Translations = typeof import('./translations').translations;
+type AnyTranslation = Translations[keyof Translations];
+
 interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
-  t: TranslationKey;
+  t: AnyTranslation;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
