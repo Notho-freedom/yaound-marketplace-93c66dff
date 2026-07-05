@@ -426,13 +426,20 @@ export function ExplorerSidebar({
               await loadDriveRoots(source.id);
             }
           };
+          const handleClick = async () => {
+            onOpenSource?.(source.id, '/');
+            // Auto-expand tree the first time a drive is clicked
+            if (!isExpanded) {
+              await handleToggle();
+            }
+          };
           return (
             <div key={source.id}>
               <SidebarItem
                 icon={driveIcon(source)}
                 label={source.name}
                 active={activeSourceId === source.id}
-                onClick={() => onOpenSource?.(source.id, '/')}
+                onClick={handleClick}
                 indent={1}
                 expandable
                 expanded={isExpanded}
