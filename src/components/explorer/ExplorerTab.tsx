@@ -15,6 +15,7 @@ import { LocalServerDetail } from '@/components/explorer/LocalServerDetail';
 import { CloudSourceBrowser } from '@/components/explorer/CloudSourceBrowser';
 import { CopyProgressBar } from '@/components/explorer/CopyProgressBar';
 import { CopyDetailDialog } from '@/components/explorer/CopyDetailDialog';
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { fileSystem } from '@/data/mockFileSystem';
 import { localServers } from '@/data/localServers';
 import { useSound } from '@/hooks/useSound';
