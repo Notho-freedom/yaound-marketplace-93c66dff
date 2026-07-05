@@ -1,2 +1,5 @@
-import HomePage from './HomePage';
-export default HomePage;
+import { FileExplorer } from '@/components/explorer';
+
+const Index = () => <FileExplorer />;
+
+export default Index;

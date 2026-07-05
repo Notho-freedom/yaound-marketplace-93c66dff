@@ -1,126 +1,142 @@
+# Plan complet — Explorer réel + refonte UX GitHub/Sidebar
 
-# 🇨🇲 Njoka — Le Bazaraki du Cameroun
+Objectif: finir en une seule passe (a) toutes les actions fichiers réelles via `explorer-server.mjs`, (b) la refonte visuelle demandée (dossiers jaunes, empty states centrés, toolbar contextuelle, sliders partout), (c) la refonte de la page GitHub (Monaco, header éclaté, commit navigable, multi-comptes), (d) previews médias au clic, (e) sidebar « Ce PC » arborescente avec chevrons, (f) connecteurs réseau étendus.
 
-## Nom & Identité
-- **Nom** : Njoka (inspiré du concept de marché/rassemblement)
-- **Slogan** : "Le N°1 du Cameroun" 
-- **Style** : Marketplace classique fonctionnel (comme Bazaraki), fond blanc, accents vert/rouge/jaune
-- **Devise** : FCFA
-- **Langues** : Français 🇫🇷 + Anglais 🇬🇧 (switch en header)
-- **Régions** : Les 10 régions du Cameroun avec toutes leurs villes principales
+Aucune simulation ne subsiste à la fin: tout job vient d'un événement serveur.
 
 ---
 
-## Pages & Vues à construire
+## 1. Backend `scripts/explorer-server.mjs` — endpoints réels + SSE
 
-### 1. Header global (toutes pages)
-- Logo Njoka + slogan
-- Barre de recherche + filtre par région/ville
-- Boutons : Compte personnel, Favoris ⭐, Messages 💬, Switch FR/EN
-- Bouton CTA : **"Publier une annonce"**
+Nouveaux endpoints, tous streamés en SSE quand ils sont longs:
 
-### 2. Page d'accueil
-- Grille de catégories avec icônes (exactement comme Bazaraki)
-- Sous-catégories en hover/dropdown
-- Sections de annonces premium par catégorie (carrousels horizontaux)
-- Footer avec liens utiles, contact, réseaux sociaux
+- `POST /api/fs/mkdir`, `/api/fs/rename`, `/api/fs/new-file`, `/api/fs/duplicate`
+- `POST /api/fs/delete` — SSE `{type:"progress",file,index,total}` puis `{type:"done"}`
+- `POST /api/fs/copy`, `/api/fs/move` — SSE avec `bytes/total/currentFile`
+- `POST /api/fs/compress` (archiver), `/api/fs/extract` (unzipper) — SSE
+- `GET  /api/fs/properties?path=…` — taille récursive, perms, dates
+- `POST /api/shell/exec` (WebSocket via `node-pty`) — terminal réel
+- `GET  /api/devices/mobile` — WPD/PowerShell (Win), `system_profiler`+`/Volumes` (mac), `lsusb`+`gio mount` (Linux)
+- `GET  /api/github/repos?sort=updated&per_page=8` — proxy authentifié
+- `POST /api/sources` — CRUD sources typées (FTP/SFTP/SMB/WebDAV/GDrive/OneDrive/Dropbox/S3), stockage AES-256-GCM dans `~/.cognitive-explorer/sources.json`
+- Drivers `sourceDriver(type).list/read/write/delete` uniformes (basic-ftp, ssh2-sftp-client, @marsaud/smb2, webdav, googleapis, @microsoft/microsoft-graph-client, dropbox, @aws-sdk/client-s3)
 
-### 3. Catégories complètes (calquées sur Bazaraki)
-- **Immobilier à vendre** : Maisons, Appartements, Terrains, Locaux commerciaux, Immeubles
-- **Immobilier à louer** : Maisons, Appartements, Chambres/Colocations, Studios, Court terme
-- **Véhicules & Motos** : Voitures, Motos, Pièces auto, Location voitures, Camions, Bus, Remorques
-- **Emplois** : Administration, Marketing, BTP, Éducation, Santé, IT, Ventes, Sécurité, Ménage, etc.
-- **Téléphones & Communication** : Téléphones mobiles, Accessoires, Montres connectées, Pièces
-- **Enfants & Bébés** : Vêtements enfants, Jouets, Poussettes, Meubles bébé, Fournitures scolaires
-- **Vêtements & Accessoires** : Vêtements, Chaussures, Sacs, Bijoux, Montres, Lunettes
-- **Informatique & Jeux** : PC, Laptops, Tablettes, Imprimantes, Consoles, Logiciels
-- **Électronique & Électroménager** : Audio, TV, Climatisation, Cuisine, Caméras, Énergie solaire
-- **Maison, Jardin & Piscine** : Meubles, Décoration, Matériaux BTP, Cuisine, Outils, Jardinage
-- **Loisirs, Sports** : Vélos, Instruments musique, Articles de sport, Hobbies
-- **Animaux** : Chiens, Chats, Oiseaux, Animaux de ferme, Accessoires, Adoption
-- **Santé & Beauté** : Maquillage, Parfums, Soins, Massages, Services adultes (18+), Produits adultes (18+)
-- **Services** : Beauté, Garde d'enfants, IT, Transport, Événements, Mariages, Cours, Marketing digital
-- **Business** : Fonds de commerce, Équipement commercial, Meubles de bureau, Fournisseurs
-- **Gratuit** : Dons et objets gratuits
+Format SSE unifié: `data: {"type":"progress"|"done"|"error", …}\n\n`.
 
-### 4. Page liste d'annonces (résultats)
-- Filtres latéraux : prix min/max, région/ville, type, état (neuf/occasion), tri
-- Vue grille et vue liste (toggle)
-- Cards annonces : image, prix FCFA, titre, localisation, date, badge premium/urgent
-- Pagination
-- Nombre total de résultats
+## 2. Frontend — fin des simulations
 
-### 5. Page détail annonce
-- Galerie photos (carrousel, lightbox plein écran)
-- Titre, prix FCFA, localisation, date publication
-- Description complète
-- Spécifications (selon catégorie : surface, chambres pour immobilier / km, année pour véhicules, etc.)
-- Informations vendeur (nom, photo, date d'inscription, nombre d'annonces)
-- Boutons : Appeler 📞, Envoyer message 💬, Ajouter aux favoris ⭐, Signaler 🚩, Partager
-- Annonces similaires en bas
-- Carte de localisation (position approximative)
+- `useFileOperations.ts`: retirer le `setInterval`, ouvrir `EventSource` sur l'endpoint, mettre à jour `copiedBytes/currentItem/processed[]` en direct. Job clos uniquement sur `done`.
+- `CopyDetailDialog.tsx`: liste scrollable des fichiers traités avec ⏳/✓/✗.
+- `useRealFileExplorer.ts`: rename/mkdir/delete/newFile/duplicate → API directe, plus aucun fallback mock.
+- `TerminalPanel.tsx`: WebSocket `/api/shell/exec` (node-pty), bouton « Se connecter » masqué si déjà attaché.
+- Nouveau helper `apiClient.ts` → `sse(path, body, onEvent)`.
 
-### 6. Publier une annonce (formulaire multi-étapes)
-- Étape 1 : Choisir catégorie → sous-catégorie
-- Étape 2 : Titre, description, prix FCFA, état (neuf/occasion)
-- Étape 3 : Upload photos (jusqu'à 15), drag & drop pour réordonner
-- Étape 4 : Localisation (région + ville)
-- Étape 5 : Champs spécifiques selon catégorie (surface, chambres, marque voiture, etc.)
-- Étape 6 : Options premium (mise en avant, urgent, top listing) — avec prix en FCFA
-- Aperçu final + publier
+## 3. Icônes dossier jaunes + fichiers propres
 
-### 7. Espace utilisateur / Mon compte
-- **Tableau de bord** : stats rapides (annonces actives, vues, messages)
-- **Mes annonces** : liste avec statuts (active, en attente, expirée, refusée), actions (modifier, supprimer, renouveler, promouvoir)
-- **Mes favoris** : liste des annonces sauvegardées
-- **Messages / Chat** : messagerie interne entre acheteurs et vendeurs, liste conversations, chat en temps réel
-- **Notifications** : alertes (nouveau message, annonce expirée, etc.)
-- **Mon profil** : modifier infos, photo, numéro de téléphone, localisation
-- **Paramètres** : langue, notifications email/push
+- `iconRegistry.ts`: substituer `locationIcons.folder`/`folderOpen` par les SVG `default_folder(_opened).svg` de **vscode-icons** (jaunes). Idem `folderNameIconMap` — garder uniquement les folders « fonctionnels » (git, node_modules, downloads…) en couleur, tout le reste devient jaune classique.
+- `FileIcon.tsx`: taille 16-20 px, `image-rendering: crisp-edges`, fallback emoji compact.
 
-### 8. Authentification
-- Page Connexion (email + mot de passe)
-- Page Inscription (nom, email, téléphone, mot de passe)
-- Mot de passe oublié
-- Vérification email/téléphone
+## 4. Empty states centrés
 
-### 9. Profil vendeur public
-- Photo, nom, date d'inscription
-- Nombre d'annonces, évaluation
-- Liste de ses annonces actives
+- `EmptyState.tsx` déjà centré ✓ — auditer chaque vue et **retirer** les listes de sources décoratives quand la vue est réellement vide (Réseau, Cloud, Corbeille, Recherche, Favoris, Récents, Mobile). Si zéro élément → uniquement l'EmptyState + CTA.
 
-### 10. Pages statiques
-- À propos de Njoka
-- Comment ça marche
-- Règles de publication
-- Politique de confidentialité
-- Conditions d'utilisation
-- Contact / Support
-- FAQ
+## 5. Toolbar contextuelle
 
-### 11. Page recherche avancée
-- Tous les filtres combinés : catégorie, sous-catégorie, prix, localisation, mots-clés, état, tri
+- `Toolbar.tsx`: prop `contextActions?: ReactNode` injectée avant « Trier ».
+- Vue Réseau → menu `+ Connexion` (FTP/SFTP/SMB/WebDAV/GDrive/OneDrive/Dropbox/S3).
+- Vue GitHub non-auth → bouton « Se connecter ».
+- Vue Dossier → « Nouveau » harmonisé avec `NewMenu`.
+- Retirer le « + » posé dans le corps de la page réseau (garder celui de la sidebar).
 
-### 12. Notifications
-- Centre de notifications (dropdown + page dédiée)
-- Types : nouveaux messages, annonce vue X fois, annonce qui expire, réponse reçue
+## 6. Sidebar — « Ce PC » arborescente + multi-comptes
 
----
+- `RealExplorerSidebar.tsx`:
+  - Chaque disque et chaque dossier avec enfants affiche un **chevron** ▸/▾ (les vides n'en ont pas). Clic sur le chevron déplie l'arborescence dans la sidebar. Clic sur le label ouvre le contenu dans le tab actif. Chargement lazy via `/api/fs/list`.
+  - Section **GitHub**: icône `+` à côté du titre → dialog « Ajouter un compte GitHub » (token PAT). Multi-comptes stockés dans `~/.cognitive-explorer/github.json`, sélecteur de compte actif.
+  - Sous « Dépôts » du compte actif: 8 dépôts les plus récents (rafraîchis toutes les 5 min ou à la demande), clic → GitHubPanel.
+  - Section **Réseau**: icône `+` → même `NewConnectionDialog` (§7). Liste les sources connectées avec icône par type.
 
-## Workflows UX complets
-1. **Parcourir** : Accueil → Catégorie → Filtrer → Voir annonce → Contacter vendeur
-2. **Publier** : S'inscrire/Se connecter → Publier annonce (multi-étapes) → Gérer dans Mon compte
-3. **Acheter/Louer** : Rechercher → Filtrer → Voir détails → Chat/Appeler vendeur → Ajouter aux favoris
-4. **Gérer** : Mon compte → Mes annonces → Modifier/Supprimer/Renouveler/Promouvoir
-5. **Communiquer** : Messagerie interne acheteur ↔ vendeur
-6. **Notifications** : Alertes en temps réel sur nouvelles interactions
+## 7. `NewConnectionDialog.tsx` (remplace `FtpConnectionDialog`)
 
----
+Sélecteur de type + champs adaptés:
+- FTP/FTPS/SFTP: host, port, user, pass/key
+- SMB: host, share, domain, user, pass
+- WebDAV: URL, user, pass
+- Google Drive: client ID/secret utilisateur + device flow
+- OneDrive: OAuth Microsoft
+- Dropbox: app key + code
+- S3/MinIO: endpoint, region, access/secret, bucket
 
-## Données de démo
-- Annonces fictives avec photos placeholder pour chaque catégorie
-- Vendeurs fictifs camerounais
-- Villes : Douala, Yaoundé, Bafoussam, Bamenda, Garoua, Maroua, Bertoua, Ebolowa, Buéa, Kribi, Limbé, Ngaoundéré
+Persistance chiffrée côté serveur (§1).
 
-## Responsive
-- Desktop, tablette et mobile (mobile-first pour le Cameroun)
+## 8. Refonte page GitHub (`GitHubPanel.tsx`)
+
+- **Header dissous**:
+  - Flèche Retour + avatar langage + nom du dépôt → dans la **Toolbar** (slot `contextActions`).
+  - Description → **tooltip** sur le nom.
+  - Branche, ⭐, forks, watchers, visibilité privé/public → **StatusBar** (bottom).
+  - Bouton « Ouvrir sur GitHub » **supprimé**.
+  - Le contenu (arborescence + éditeur) occupe tout l'espace récupéré.
+- **Monaco Editor** (`@monaco-editor/react`) pour l'affichage du code, thème `vs-dark` accordé aux tokens Midnight Indigo, langue détectée par extension.
+- **Commits navigables**: clic sur un commit → rechargement de l'arborescence à ce SHA via `GET /repos/:o/:r/git/trees/:sha?recursive=1`, badge « @sha1234 » dans la Toolbar, bouton « Revenir à HEAD ». Aucun `window.open`.
+- **Slider** (Resizable) entre arborescence et éditeur.
+
+## 9. Previews médias automatiques
+
+- `PreviewPanel.tsx`: au **clic simple** sur un fichier média (image, vidéo, audio, PDF, texte, code) → panneau preview s'ouvre automatiquement (image `<img>`, vidéo `<video controls>`, audio `<audio controls>`, PDF via `<embed>`, texte/code via Monaco read-only). Toggle pour désactiver.
+- Chargement via `/api/fs/read?path=…` en stream, ou URL blob pour les binaires.
+
+## 10. Sliders partout (Resizable)
+
+Utiliser `src/components/ui/resizable.tsx` (déjà présent) pour:
+- Sidebar ↔ zone de contenu (RealExplorerTab)
+- Arborescence GitHub ↔ Monaco (GitHubPanel)
+- Contenu ↔ PreviewPanel
+- SplitView gauche ↔ droite (déjà fait, à vérifier)
+- Terminal (hauteur ajustable)
+
+Persister les tailles dans `localStorage`.
+
+## 11. Loading & feedback
+
+- `LoadingShimmer.tsx` (déjà présent) — l'utiliser partout à la place des spinners: listes fichiers, chargement dépôt, chargement preview.
+- Dot pulse indigo pour actions ponctuelles.
+
+## 12. Nettoyage menus contextuels
+
+- `contextMenuConfig.tsx`: retirer « Remonter ». Vérifier cohérence par cible.
+- « Renommer » branché sur `/api/fs/rename`.
+
+## 13. Fichiers touchés
+
+**Backend**
+- `scripts/explorer-server.mjs`, nouveau `scripts/source-drivers/*.mjs`, `scripts/crypto.mjs`, `scripts/pty.mjs`
+
+**Nouveaux composants**
+- `NewConnectionDialog.tsx`, `AddGithubAccountDialog.tsx`, `GithubAccountSwitcher.tsx`, `SidebarTree.tsx`, `MonacoCode.tsx`, `MediaPreview.tsx`, `DeletionProgressList.tsx`
+
+**Refactor**
+- `useFileOperations.ts`, `useRealFileExplorer.ts`, `apiClient.ts` (+ helper SSE)
+- `CopyDetailDialog.tsx`, `CopyProgressBar.tsx`, `Toolbar.tsx`, `StatusBar.tsx`
+- `RealExplorerSidebar.tsx` (tree + chevrons + multi-comptes + `+` réseau)
+- `RealExplorerTab.tsx` (slider sidebar, toolbar contextuelle)
+- `GitHubPanel.tsx` (header éclaté, Monaco, commit → tree SHA, slider)
+- `PreviewPanel.tsx` (auto-preview au clic, Monaco RO)
+- `MobileDeviceView.tsx`, `TerminalPanel.tsx`
+- `FileIcon.tsx`, `icons/iconRegistry.ts` (dossiers jaunes)
+- `contextMenuConfig.tsx`
+
+**Dépendances à ajouter**
+- Runtime: `@monaco-editor/react`, `monaco-editor`
+- Backend: `archiver`, `unzipper`, `basic-ftp`, `ssh2-sftp-client`, `@marsaud/smb2`, `webdav`, `googleapis`, `@microsoft/microsoft-graph-client`, `dropbox`, `@aws-sdk/client-s3`, `node-pty`, `ws`
+
+## Section technique
+
+- SSE: `Content-Type: text/event-stream`, keep-alive 15 s, `AbortController` côté client pour cancel.
+- Chiffrement sources: AES-256-GCM, clé dérivée `scrypt(os.hostname()+machineId, salt)`, salt persisté `~/.cognitive-explorer/key`.
+- Multi-comptes GitHub: `[{id,label,token,scopes,addedAt}]`, header `Authorization: Bearer <token>` du compte actif; refresh dépôts récents via `If-None-Match` (ETag).
+- Sidebar tree lazy: expansion appelle `/api/fs/list?path=…` et met en cache 30 s.
+- Monaco: import dynamique pour éviter d'alourdir le bundle initial; worker via Vite `?worker`.
+- Commit navigation: `git/trees/:sha?recursive=1` puis `git/blobs/:sha` pour le contenu; badge SHA + bouton HEAD dans Toolbar.
+- Sliders: persister `panel-size:<id>` dans `localStorage` via `onLayout` de `react-resizable-panels`.
+- Node-pty: fallback `child_process.spawn` si binaire indisponible (message clair, pas de crash).

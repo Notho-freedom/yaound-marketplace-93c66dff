@@ -1,31 +1,34 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
-import { translations, Language, TranslationKey } from './translations';
+import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import translations, { Locale } from './translations';
 
-type Translations = typeof import('./translations').translations;
-type AnyTranslation = Translations[keyof Translations];
+export type { Locale };
 
-interface LanguageContextType {
-  language: Language;
-  setLanguage: (lang: Language) => void;
-  t: AnyTranslation;
+interface I18nContextType {
+  locale: Locale;
+  setLocale: (l: Locale) => void;
+  t: (key: string) => string;
 }
 
-const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
+const I18nContext = createContext<I18nContextType>({
+  locale: 'fr',
+  setLocale: () => {},
+  t: (key) => key,
+});
 
-export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [language, setLang] = useState<Language>('fr');
-  const setLanguage = useCallback((lang: Language) => setLang(lang), []);
-  const t = translations[language];
+export function I18nProvider({ children, initialLocale = 'fr' }: { children: ReactNode; initialLocale?: Locale }) {
+  const [locale, setLocale] = useState<Locale>(initialLocale);
+
+  const t = useCallback((key: string): string => {
+    return translations[key]?.[locale] ?? key;
+  }, [locale]);
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t }}>
+    <I18nContext.Provider value={{ locale, setLocale, t }}>
       {children}
-    </LanguageContext.Provider>
+    </I18nContext.Provider>
   );
-};
+}
 
-export const useLanguage = () => {
-  const ctx = useContext(LanguageContext);
-  if (!ctx) throw new Error('useLanguage must be used within LanguageProvider');
-  return ctx;
-};
+export function useI18n() {
+  return useContext(I18nContext);
+}
