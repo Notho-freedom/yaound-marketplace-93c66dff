@@ -405,6 +405,7 @@ export function ExplorerTab({ active, initialFolderId, onFolderChange, onOpenCom
           if (activeSource) setSourceRefreshSignal((value) => value + 1);
         }}
         onTestConnection={activeSource ? () => setSourceTestSignal((value) => value + 1) : undefined}
+        contextActions={githubDetail?.header}
       />
 
       <div className="flex flex-1 overflow-hidden min-h-0">
