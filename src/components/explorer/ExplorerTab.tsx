@@ -301,13 +301,21 @@ export function ExplorerTab({ active, initialFolderId, onFolderChange, onOpenCom
     const onNav = (e: Event) => { const id = (e as CustomEvent).detail?.id; if (id) handleNavigate(id); };
     const onTogglePreview = () => explorer.togglePreview();
     const onToggleHidden = () => explorer.setShowHidden(!explorer.showHidden);
+    const onOpenRepo = () => {
+      // Ensure GitHub panel is visible; GitHubPanel listens for the same event to open the repo
+      setShowGithub(true);
+      setActiveServerId(null);
+      setActiveSourceId(null);
+    };
     window.addEventListener('explorer-nav', onNav);
     window.addEventListener('explorer-toggle-preview', onTogglePreview);
     window.addEventListener('explorer-toggle-hidden', onToggleHidden);
+    window.addEventListener('github:open-repo', onOpenRepo);
     return () => {
       window.removeEventListener('explorer-nav', onNav);
       window.removeEventListener('explorer-toggle-preview', onTogglePreview);
       window.removeEventListener('explorer-toggle-hidden', onToggleHidden);
+      window.removeEventListener('github:open-repo', onOpenRepo);
     };
   }, [active, explorer, handleNavigate]);
 
