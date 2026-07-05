@@ -55,6 +55,7 @@ export function ExplorerTab({ active, initialFolderId, onFolderChange, onOpenCom
   const [sourceRefreshSignal, setSourceRefreshSignal] = useState(0);
   const [sourceTestSignal, setSourceTestSignal] = useState(0);
   const [terminalOpen, setTerminalOpen] = useState(false);
+  const [githubDetail, setGithubDetail] = useState<{ header: React.ReactNode; footer: React.ReactNode } | null>(null);
   const notif = useNotifications();
   const sourceApi = useExplorerSources();
   const didAutoOpenSource = useRef(false);
@@ -69,7 +70,16 @@ export function ExplorerTab({ active, initialFolderId, onFolderChange, onOpenCom
   const handleOpen = useCallback((id: string) => {
     const item = fileSystem[id];
     if (item?.type === 'folder') { play('open'); explorer.navigateTo(id); }
-    else { play('dblclick'); explorer.selectItem(id); explorer.openPreview(); }
+    else {
+      play('dblclick');
+      explorer.selectItem(id);
+      // Auto-open preview panel for media
+      if (item && ['image', 'video', 'audio'].includes(item.type)) {
+        explorer.openPreview();
+      } else {
+        explorer.openPreview();
+      }
+    }
   }, [explorer, play]);
 
   const handleNavigate = useCallback((id: string) => {
