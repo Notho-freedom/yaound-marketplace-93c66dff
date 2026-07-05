@@ -15,9 +15,11 @@ interface Props {
   iconSize: number;
   onIconSizeChange: (size: number) => void;
   onOpenCommandPalette: () => void;
+  /** Contextual footer content (e.g. GitHub repo details). Rendered on the left, replaces the default counters. */
+  contextInfo?: React.ReactNode;
 }
 
-export function StatusBar({ files, selectedCount, iconSize, onIconSizeChange, onOpenCommandPalette }: Props) {
+export function StatusBar({ files, selectedCount, iconSize, onIconSizeChange, onOpenCommandPalette, contextInfo }: Props) {
   const { t } = useI18n();
   const { muted, toggleMuted, playHover } = useSound();
   const { clipboard } = useGlobalClipboard();
@@ -27,12 +29,18 @@ export function StatusBar({ files, selectedCount, iconSize, onIconSizeChange, on
 
   return (
     <div className="flex items-center justify-between px-2 h-6 border-t border-border/40 bg-[hsl(var(--explorer-surface))] text-[11px] text-muted-foreground select-none font-light shrink-0">
-      <div className="flex items-center gap-3 min-w-0">
-        <span className="font-mono text-[10px] text-muted-foreground/60">UTF-8</span>
-        <span className="font-mono text-[10px] text-muted-foreground/60">LF</span>
-        <span>{folderCount} {t('status.folders')} · {fileCount} {t('status.files')}</span>
-        {selectedCount > 0 && <span className="text-primary">{selectedCount} {t(selectedCount !== 1 ? 'status.selected_plural' : 'status.selected')}</span>}
-        {totalSize > 0 && <span className="font-mono">{formatFileSize(totalSize)}</span>}
+      <div className="flex items-center gap-3 min-w-0 overflow-hidden">
+        {contextInfo ? (
+          contextInfo
+        ) : (
+          <>
+            <span className="font-mono text-[10px] text-muted-foreground/60">UTF-8</span>
+            <span className="font-mono text-[10px] text-muted-foreground/60">LF</span>
+            <span>{folderCount} {t('status.folders')} · {fileCount} {t('status.files')}</span>
+            {selectedCount > 0 && <span className="text-primary">{selectedCount} {t(selectedCount !== 1 ? 'status.selected_plural' : 'status.selected')}</span>}
+            {totalSize > 0 && <span className="font-mono">{formatFileSize(totalSize)}</span>}
+          </>
+        )}
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <div className="flex items-center gap-1.5 w-28">

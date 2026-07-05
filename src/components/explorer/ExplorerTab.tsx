@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { useFileExplorer } from '@/hooks/useFileExplorer';
 import { ExplorerSidebar } from '@/components/explorer/ExplorerSidebar';
@@ -15,6 +15,7 @@ import { LocalServerDetail } from '@/components/explorer/LocalServerDetail';
 import { CloudSourceBrowser } from '@/components/explorer/CloudSourceBrowser';
 import { CopyProgressBar } from '@/components/explorer/CopyProgressBar';
 import { CopyDetailDialog } from '@/components/explorer/CopyDetailDialog';
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { fileSystem } from '@/data/mockFileSystem';
 import { localServers } from '@/data/localServers';
 import { useSound } from '@/hooks/useSound';
@@ -54,6 +55,7 @@ export function ExplorerTab({ active, initialFolderId, onFolderChange, onOpenCom
   const [sourceRefreshSignal, setSourceRefreshSignal] = useState(0);
   const [sourceTestSignal, setSourceTestSignal] = useState(0);
   const [terminalOpen, setTerminalOpen] = useState(false);
+  const [githubDetail, setGithubDetail] = useState<{ header: ReactNode; footer: ReactNode } | null>(null);
   const notif = useNotifications();
   const sourceApi = useExplorerSources();
   const didAutoOpenSource = useRef(false);
@@ -68,7 +70,16 @@ export function ExplorerTab({ active, initialFolderId, onFolderChange, onOpenCom
   const handleOpen = useCallback((id: string) => {
     const item = fileSystem[id];
     if (item?.type === 'folder') { play('open'); explorer.navigateTo(id); }
-    else { play('dblclick'); explorer.selectItem(id); explorer.openPreview(); }
+    else {
+      play('dblclick');
+      explorer.selectItem(id);
+      // Auto-open preview panel for media
+      if (item && ['image', 'video', 'audio'].includes(item.type)) {
+        explorer.openPreview();
+      } else {
+        explorer.openPreview();
+      }
+    }
   }, [explorer, play]);
 
   const handleNavigate = useCallback((id: string) => {
@@ -290,13 +301,21 @@ export function ExplorerTab({ active, initialFolderId, onFolderChange, onOpenCom
     const onNav = (e: Event) => { const id = (e as CustomEvent).detail?.id; if (id) handleNavigate(id); };
     const onTogglePreview = () => explorer.togglePreview();
     const onToggleHidden = () => explorer.setShowHidden(!explorer.showHidden);
+    const onOpenRepo = () => {
+      // Ensure GitHub panel is visible; GitHubPanel listens for the same event to open the repo
+      setShowGithub(true);
+      setActiveServerId(null);
+      setActiveSourceId(null);
+    };
     window.addEventListener('explorer-nav', onNav);
     window.addEventListener('explorer-toggle-preview', onTogglePreview);
     window.addEventListener('explorer-toggle-hidden', onToggleHidden);
+    window.addEventListener('github:open-repo', onOpenRepo);
     return () => {
       window.removeEventListener('explorer-nav', onNav);
       window.removeEventListener('explorer-toggle-preview', onTogglePreview);
       window.removeEventListener('explorer-toggle-hidden', onToggleHidden);
+      window.removeEventListener('github:open-repo', onOpenRepo);
     };
   }, [active, explorer, handleNavigate]);
 
@@ -386,85 +405,95 @@ export function ExplorerTab({ active, initialFolderId, onFolderChange, onOpenCom
           if (activeSource) setSourceRefreshSignal((value) => value + 1);
         }}
         onTestConnection={activeSource ? () => setSourceTestSignal((value) => value + 1) : undefined}
+        contextActions={githubDetail?.header}
       />
 
-      <div className="flex flex-1 overflow-hidden min-h-0">
-        <ExplorerSidebar
-          currentFolderId={explorer.nav.currentFolderId}
-          expandedNodes={explorer.nav.expandedNodes}
-          onNavigate={handleNavigate}
-          onNavigateVirtual={handleNavigateVirtual}
-          onToggleExpand={explorer.toggleExpanded}
-          onOpenGithub={() => { setActiveServerId(null); setActiveSourceId(null); setActiveSourcePath('/'); setShowGithub(true); }}
-          githubActive={showGithub}
-          onSidebarDrop={handleSidebarDrop}
-          onOpenSource={handleOpenSource}
-          activeSourceId={activeSourceId}
-          activeSourcePath={activeSourcePath}
-        />
-
-        <div className="flex-1 flex overflow-hidden min-w-0" onContextMenu={handleBackgroundContextMenu}>
-          {activeSource ? (
-            <CloudSourceBrowser
-              source={activeSource}
-              initialPath={activeSourcePath}
-              viewMode={explorer.nav.viewMode}
-              searchQuery={explorer.nav.searchQuery}
-              showExtensions={explorer.showExtensions}
-              iconSize={explorer.nav.iconSize}
-              sortField={explorer.nav.sortField}
-              sortDirection={explorer.nav.sortDirection}
-              onSort={explorer.setSort}
-              refreshSignal={sourceRefreshSignal}
-              testSignal={sourceTestSignal}
-              onPathChange={setActiveSourcePath}
-              onActiveFileChange={setActiveSourceFile}
-              onBack={() => { setActiveSourceId(null); setActiveSourcePath('/'); setActiveSourceFile(null); }}
-            />
-          ) : activeServer ? (
-            <LocalServerDetail server={activeServer} onBack={() => setActiveServerId(null)} />
-          ) : showGithub ? (
-            <GitHubPanel onNavigate={handleNavigate} />
-          ) : (virtualId === 'this-pc' || virtualId === 'quick-access') ? (
-            <DriveOverview onNavigate={handleNavigate} onNavigateTrash={() => handleNavigateVirtual('trash')} mode="this-pc" onOpenSource={handleOpenSource} />
-          ) : virtualId === 'network' ? (
-            <DriveOverview
-              onNavigate={handleNavigate}
-              mode="network"
-              onOpenSource={handleOpenSource}
-            />
-          ) : isMobileRoot ? (
-            <MobileDeviceView onNavigate={handleNavigate} />
-          ) : (
-            <FileGrid
-              files={explorer.currentChildren}
-              viewMode={explorer.nav.viewMode}
-              selectedItems={explorer.nav.selectedItems}
-              clipboardItems={explorer.clipboard.operation === 'cut' ? explorer.clipboard.items : []}
-              showExtensions={explorer.showExtensions}
-              iconSize={explorer.nav.iconSize}
-              renamingId={explorer.nav.renamingId}
-              renamedItems={explorer.renamedItems}
-              sortField={explorer.nav.sortField}
-              sortDirection={explorer.nav.sortDirection}
-              onSelect={explorer.selectItem}
-              onOpen={handleOpen}
-              onContextMenu={handleContextMenu}
-              onClearSelection={explorer.clearSelection}
-              onConfirmRename={explorer.confirmRename}
-              onCancelRename={explorer.cancelRename}
-              onSort={explorer.setSort}
-              onDropOnFolder={(folderId, ids, copy) => handleSidebarDrop(folderId, ids, copy)}
-            />
-          )}
-
-          <AnimatePresence>
-            {explorer.nav.showPreview && (
-              <PreviewPanel file={selectedFile} displayName={selectedDisplayName} onClose={explorer.togglePreview} />
+      <ResizablePanelGroup direction="horizontal" className="flex flex-1 overflow-hidden min-h-0" autoSaveId="explorer-sidebar-main">
+        <ResizablePanel defaultSize={16} minSize={8} maxSize={35} collapsible collapsedSize={3}>
+          <ExplorerSidebar
+            currentFolderId={explorer.nav.currentFolderId}
+            expandedNodes={explorer.nav.expandedNodes}
+            onNavigate={handleNavigate}
+            onNavigateVirtual={handleNavigateVirtual}
+            onToggleExpand={explorer.toggleExpanded}
+            onOpenGithub={() => { setActiveServerId(null); setActiveSourceId(null); setActiveSourcePath('/'); setShowGithub(true); }}
+            onOpenRepo={(repo) => {
+              setActiveServerId(null); setActiveSourceId(null); setActiveSourcePath('/'); setShowGithub(true);
+              // Delegate opening to GitHubPanel via event bus
+              window.dispatchEvent(new CustomEvent('github:open-repo', { detail: { fullName: repo.full_name } }));
+            }}
+            githubActive={showGithub}
+            onSidebarDrop={handleSidebarDrop}
+            onOpenSource={handleOpenSource}
+            activeSourceId={activeSourceId}
+            activeSourcePath={activeSourcePath}
+          />
+        </ResizablePanel>
+        <ResizableHandle withHandle className="bg-border/40" />
+        <ResizablePanel defaultSize={84} minSize={40}>
+          <div className="h-full flex overflow-hidden min-w-0" onContextMenu={handleBackgroundContextMenu}>
+            {activeSource ? (
+              <CloudSourceBrowser
+                source={activeSource}
+                initialPath={activeSourcePath}
+                viewMode={explorer.nav.viewMode}
+                searchQuery={explorer.nav.searchQuery}
+                showExtensions={explorer.showExtensions}
+                iconSize={explorer.nav.iconSize}
+                sortField={explorer.nav.sortField}
+                sortDirection={explorer.nav.sortDirection}
+                onSort={explorer.setSort}
+                refreshSignal={sourceRefreshSignal}
+                testSignal={sourceTestSignal}
+                onPathChange={setActiveSourcePath}
+                onActiveFileChange={setActiveSourceFile}
+                onBack={() => { setActiveSourceId(null); setActiveSourcePath('/'); setActiveSourceFile(null); }}
+              />
+            ) : activeServer ? (
+              <LocalServerDetail server={activeServer} onBack={() => setActiveServerId(null)} />
+            ) : showGithub ? (
+              <GitHubPanel onNavigate={handleNavigate} onDetailContextChange={setGithubDetail} />
+            ) : (virtualId === 'this-pc' || virtualId === 'quick-access') ? (
+              <DriveOverview onNavigate={handleNavigate} onNavigateTrash={() => handleNavigateVirtual('trash')} mode="this-pc" onOpenSource={handleOpenSource} />
+            ) : virtualId === 'network' ? (
+              <DriveOverview
+                onNavigate={handleNavigate}
+                mode="network"
+                onOpenSource={handleOpenSource}
+              />
+            ) : isMobileRoot ? (
+              <MobileDeviceView onNavigate={handleNavigate} />
+            ) : (
+              <FileGrid
+                files={explorer.currentChildren}
+                viewMode={explorer.nav.viewMode}
+                selectedItems={explorer.nav.selectedItems}
+                clipboardItems={explorer.clipboard.operation === 'cut' ? explorer.clipboard.items : []}
+                showExtensions={explorer.showExtensions}
+                iconSize={explorer.nav.iconSize}
+                renamingId={explorer.nav.renamingId}
+                renamedItems={explorer.renamedItems}
+                sortField={explorer.nav.sortField}
+                sortDirection={explorer.nav.sortDirection}
+                onSelect={explorer.selectItem}
+                onOpen={handleOpen}
+                onContextMenu={handleContextMenu}
+                onClearSelection={explorer.clearSelection}
+                onConfirmRename={explorer.confirmRename}
+                onCancelRename={explorer.cancelRename}
+                onSort={explorer.setSort}
+                onDropOnFolder={(folderId, ids, copy) => handleSidebarDrop(folderId, ids, copy)}
+              />
             )}
-          </AnimatePresence>
-        </div>
-      </div>
+
+            <AnimatePresence>
+              {explorer.nav.showPreview && (
+                <PreviewPanel file={selectedFile} displayName={selectedDisplayName} onClose={explorer.togglePreview} />
+              )}
+            </AnimatePresence>
+          </div>
+        </ResizablePanel>
+      </ResizablePanelGroup>
 
       <TerminalPanel
         open={terminalOpen}
@@ -489,6 +518,7 @@ export function ExplorerTab({ active, initialFolderId, onFolderChange, onOpenCom
         iconSize={explorer.nav.iconSize}
         onIconSizeChange={explorer.setIconSize}
         onOpenCommandPalette={onOpenCommandPalette}
+        contextInfo={githubDetail?.footer}
       />
 
       <ExplorerContextMenu

@@ -65,6 +65,15 @@ export const api = {
     const data = await res.json().catch(() => ({} as T));
     return { status: res.status, data: data as T };
   },
+  githubPut: async <T>(subPath: string, body: unknown, token: string): Promise<{ status: number; data: T }> => {
+    const res = await fetch(apiUrl(`/api/github${subPath.startsWith('/') ? '' : '/'}${subPath}`), {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({} as T));
+    return { status: res.status, data: data as T };
+  },
 };
 
 // True when the API server is reachable (either via injected apiBase or dev proxy).

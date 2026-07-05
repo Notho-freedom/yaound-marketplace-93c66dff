@@ -10,6 +10,8 @@ import { openContextMenu } from '@/lib/contextMenuBus';
 import { useExplorerSources } from '@/hooks/useExplorerSources';
 import { EXPLORER_DND_MIME } from '@/hooks/useDragDrop';
 import { FtpConnectionDialog } from './FtpConnectionDialog';
+import { GitHubAuthDialog } from './GitHubAuthDialog';
+import { saveGithubToken } from './GitHubAuthCard';
 import type { ExplorerSource } from '@/types/explorerSources';
 
 interface Props {
@@ -312,6 +314,7 @@ export function ExplorerSidebar({
   const { sources, isAvailable, list } = useExplorerSources();
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => readCollapsed());
   const [ftpOpen, setFtpOpen] = useState(false);
+  const [ghAuthOpen, setGhAuthOpen] = useState(false);
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
   const [loadingPaths, setLoadingPaths] = useState<Set<string>>(new Set());
   const [driveRoots, setDriveRoots] = useState<Record<string, DirEntry[]>>({});
@@ -395,7 +398,7 @@ export function ExplorerSidebar({
   };
 
   return (
-    <div className="h-full flex flex-col bg-[hsl(var(--sidebar-background))] border-r border-[hsl(var(--sidebar-border))] overflow-y-auto w-56 shrink-0 select-none">
+    <div className="h-full flex flex-col bg-[hsl(var(--sidebar-background))] border-r border-[hsl(var(--sidebar-border))] overflow-y-auto w-full select-none">
       <Section k="quick" label={t('sidebar.quickAccess')} collapsed={!!collapsed.quick} onToggle={toggleSection}>
         {!homeSource && <EmptyLine>{isAvailable ? 'Dossier utilisateur indisponible' : 'API locale indisponible'}</EmptyLine>}
         {homeSource && QUICK_ACCESS.map((item) => (
@@ -423,13 +426,20 @@ export function ExplorerSidebar({
               await loadDriveRoots(source.id);
             }
           };
+          const handleClick = async () => {
+            onOpenSource?.(source.id, '/');
+            // Auto-expand tree the first time a drive is clicked
+            if (!isExpanded) {
+              await handleToggle();
+            }
+          };
           return (
             <div key={source.id}>
               <SidebarItem
                 icon={driveIcon(source)}
                 label={source.name}
                 active={activeSourceId === source.id}
-                onClick={() => onOpenSource?.(source.id, '/')}
+                onClick={handleClick}
                 indent={1}
                 expandable
                 expanded={isExpanded}
@@ -520,8 +530,22 @@ export function ExplorerSidebar({
         <EmptyLine>Aucun appareil mobile réel détecté</EmptyLine>
       </Section>
 
-      {ghUser && (
-        <Section k="github" label={t('sidebar.github')} collapsed={!!collapsed.github} onToggle={toggleSection}>
+      <Section
+        k="github"
+        label={t('sidebar.github')}
+        collapsed={!!collapsed.github}
+        onToggle={toggleSection}
+        action={
+          <button
+            onClick={() => setGhAuthOpen(true)}
+            className="p-1 rounded hover:bg-[hsl(var(--explorer-hover))] text-muted-foreground hover:text-foreground"
+            title="Ajouter un compte GitHub"
+          >
+            <Plus size={11} />
+          </button>
+        }
+      >
+        {ghUser ? (
           <SidebarItem
             icon={ghUser.avatar_url}
             label={ghUser.name || ghUser.login}
@@ -529,25 +553,27 @@ export function ExplorerSidebar({
             onClick={onOpenGithub}
             isCircular={true}
           />
-          {recentRepos.length === 0 ? (
-            <EmptyLine>Aucun dépôt récent</EmptyLine>
-          ) : (
-            recentRepos.slice(0, 8).map((repo) => {
-              const langIcon = getLangIcon(repo.language);
-              return (
-                <SidebarItem
-                  key={repo.id}
-                  icon={langIcon}
-                  label={repo.name}
-                  active={false}
-                  onClick={() => onOpenRepo?.(repo)}
-                  indent={1}
-                />
-              );
-            })
-          )}
-        </Section>
-      )}
+        ) : (
+          <EmptyLine>Aucun compte connecté</EmptyLine>
+        )}
+        {ghUser && recentRepos.length === 0 ? (
+          <EmptyLine>Aucun dépôt récent</EmptyLine>
+        ) : (
+          recentRepos.slice(0, 8).map((repo) => {
+            const langIcon = getLangIcon(repo.language);
+            return (
+              <SidebarItem
+                key={repo.id}
+                icon={langIcon}
+                label={repo.name}
+                active={false}
+                onClick={() => onOpenRepo?.(repo)}
+                indent={1}
+              />
+            );
+          })
+        )}
+      </Section>
 
       <div className="flex-1 min-h-4" />
 
@@ -557,6 +583,17 @@ export function ExplorerSidebar({
         onCreated={(source) => {
           void list(source.id, '/', { force: true });
           onOpenSource?.(source.id, '/');
+        }}
+      />
+
+      <GitHubAuthDialog
+        open={ghAuthOpen}
+        onOpenChange={setGhAuthOpen}
+        onAuthenticated={(token) => {
+          saveGithubToken(token);
+          // Trigger the GitHub panel to reload via a storage event tick + open it
+          window.dispatchEvent(new CustomEvent('github:recent-updated'));
+          onOpenGithub();
         }}
       />
     </div>
