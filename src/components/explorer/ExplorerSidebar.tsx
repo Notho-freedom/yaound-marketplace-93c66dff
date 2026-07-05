@@ -530,8 +530,22 @@ export function ExplorerSidebar({
         <EmptyLine>Aucun appareil mobile réel détecté</EmptyLine>
       </Section>
 
-      {ghUser && (
-        <Section k="github" label={t('sidebar.github')} collapsed={!!collapsed.github} onToggle={toggleSection}>
+      <Section
+        k="github"
+        label={t('sidebar.github')}
+        collapsed={!!collapsed.github}
+        onToggle={toggleSection}
+        action={
+          <button
+            onClick={() => setGhAuthOpen(true)}
+            className="p-1 rounded hover:bg-[hsl(var(--explorer-hover))] text-muted-foreground hover:text-foreground"
+            title="Ajouter un compte GitHub"
+          >
+            <Plus size={11} />
+          </button>
+        }
+      >
+        {ghUser ? (
           <SidebarItem
             icon={ghUser.avatar_url}
             label={ghUser.name || ghUser.login}
@@ -539,25 +553,27 @@ export function ExplorerSidebar({
             onClick={onOpenGithub}
             isCircular={true}
           />
-          {recentRepos.length === 0 ? (
-            <EmptyLine>Aucun dépôt récent</EmptyLine>
-          ) : (
-            recentRepos.slice(0, 8).map((repo) => {
-              const langIcon = getLangIcon(repo.language);
-              return (
-                <SidebarItem
-                  key={repo.id}
-                  icon={langIcon}
-                  label={repo.name}
-                  active={false}
-                  onClick={() => onOpenRepo?.(repo)}
-                  indent={1}
-                />
-              );
-            })
-          )}
-        </Section>
-      )}
+        ) : (
+          <EmptyLine>Aucun compte connecté</EmptyLine>
+        )}
+        {ghUser && recentRepos.length === 0 ? (
+          <EmptyLine>Aucun dépôt récent</EmptyLine>
+        ) : (
+          recentRepos.slice(0, 8).map((repo) => {
+            const langIcon = getLangIcon(repo.language);
+            return (
+              <SidebarItem
+                key={repo.id}
+                icon={langIcon}
+                label={repo.name}
+                active={false}
+                onClick={() => onOpenRepo?.(repo)}
+                indent={1}
+              />
+            );
+          })
+        )}
+      </Section>
 
       <div className="flex-1 min-h-4" />
 
@@ -567,6 +583,17 @@ export function ExplorerSidebar({
         onCreated={(source) => {
           void list(source.id, '/', { force: true });
           onOpenSource?.(source.id, '/');
+        }}
+      />
+
+      <GitHubAuthDialog
+        open={ghAuthOpen}
+        onOpenChange={setGhAuthOpen}
+        onAuthenticated={(token) => {
+          saveGithubToken(token);
+          // Trigger the GitHub panel to reload via a storage event tick + open it
+          window.dispatchEvent(new CustomEvent('github:recent-updated'));
+          onOpenGithub();
         }}
       />
     </div>
