@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { useFileExplorer } from '@/hooks/useFileExplorer';
 import { ExplorerSidebar } from '@/components/explorer/ExplorerSidebar';
