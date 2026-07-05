@@ -10,6 +10,8 @@ import { openContextMenu } from '@/lib/contextMenuBus';
 import { useExplorerSources } from '@/hooks/useExplorerSources';
 import { EXPLORER_DND_MIME } from '@/hooks/useDragDrop';
 import { FtpConnectionDialog } from './FtpConnectionDialog';
+import { GitHubAuthDialog } from './GitHubAuthDialog';
+import { saveGithubToken } from './GitHubAuthCard';
 import type { ExplorerSource } from '@/types/explorerSources';
 
 interface Props {
