@@ -55,7 +55,7 @@ export function ExplorerTab({ active, initialFolderId, onFolderChange, onOpenCom
   const [sourceRefreshSignal, setSourceRefreshSignal] = useState(0);
   const [sourceTestSignal, setSourceTestSignal] = useState(0);
   const [terminalOpen, setTerminalOpen] = useState(false);
-  const [githubDetail, setGithubDetail] = useState<{ header: React.ReactNode; footer: React.ReactNode } | null>(null);
+  const [githubDetail, setGithubDetail] = useState<{ header: ReactNode; footer: ReactNode } | null>(null);
   const notif = useNotifications();
   const sourceApi = useExplorerSources();
   const didAutoOpenSource = useRef(false);
