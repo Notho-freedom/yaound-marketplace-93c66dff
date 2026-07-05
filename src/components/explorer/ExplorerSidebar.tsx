@@ -398,7 +398,7 @@ export function ExplorerSidebar({
   };
 
   return (
-    <div className="h-full flex flex-col bg-[hsl(var(--sidebar-background))] border-r border-[hsl(var(--sidebar-border))] overflow-y-auto w-56 shrink-0 select-none">
+    <div className="h-full flex flex-col bg-[hsl(var(--sidebar-background))] border-r border-[hsl(var(--sidebar-border))] overflow-y-auto w-full select-none">
       <Section k="quick" label={t('sidebar.quickAccess')} collapsed={!!collapsed.quick} onToggle={toggleSection}>
         {!homeSource && <EmptyLine>{isAvailable ? 'Dossier utilisateur indisponible' : 'API locale indisponible'}</EmptyLine>}
         {homeSource && QUICK_ACCESS.map((item) => (
