@@ -518,6 +518,7 @@ export function ExplorerTab({ active, initialFolderId, onFolderChange, onOpenCom
         iconSize={explorer.nav.iconSize}
         onIconSizeChange={explorer.setIconSize}
         onOpenCommandPalette={onOpenCommandPalette}
+        contextInfo={githubDetail?.footer}
       />
 
       <ExplorerContextMenu
