@@ -314,6 +314,7 @@ export function ExplorerSidebar({
   const { sources, isAvailable, list } = useExplorerSources();
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => readCollapsed());
   const [ftpOpen, setFtpOpen] = useState(false);
+  const [ghAuthOpen, setGhAuthOpen] = useState(false);
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
   const [loadingPaths, setLoadingPaths] = useState<Set<string>>(new Set());
   const [driveRoots, setDriveRoots] = useState<Record<string, DirEntry[]>>({});
